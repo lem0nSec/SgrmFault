@@ -1,0 +1,30 @@
+# C++ / Visual Studio
+# ===================
+# Binaries, libraries, and build outputs
+*.lib
+*.pdb
+*.obj
+*.ilk
+*.exe
+*.dll
+*.gch
+*.pch
+
+# Build folders
+[Bb]uild/
+[Dd]ebug/
+[Rr]elease/
+x64/
+ARM/
+ARM64/
+
+# Visual Studio files
+.vs/
+*.sln.docstates
+*.suo
+*.user
+*.vcxproj.user
+
+# Keep dependency binaries
+!bins/
+!bins/**
