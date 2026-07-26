@@ -5,37 +5,17 @@
 
 DEBUG_INTERFACES DebugInterfaces{};
 
-std::wstring base64_encode(PVOID inbuf, DWORD inlen) {
-    // Get the length of output
-    DWORD outlen;
-
-    CryptBinaryToStringW(
-        (const PBYTE)inbuf,
-        inlen,
-        CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
-        NULL,
-        &outlen
-    );
-
-    std::wstring outbuf(outlen - 1, L'\0');
-
-    CryptBinaryToStringW(
-        (const PBYTE)inbuf,
-        inlen,
-        CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
-        &outbuf[0],
-        &outlen
-    );
-
-    return outbuf;
-}
-
 bool
 DumpInitializeUtils(
     _In_ PCSTR DumpFile)
 {
     bool status = false;
     HRESULT hr{};
+
+    if (DebugInterfaces.initialized) {
+        status = true;
+        goto cleanup;
+    }
 
     hr = DebugCreate(__uuidof(IDebugClient), (void**)&DebugInterfaces.pDebugClient);
     if (FAILED(hr)) {
@@ -239,7 +219,7 @@ SearchPatternInCombaseDataSection(_In_ void* pattern, _In_ SIZE_T szPattern)
     }
 
     for (unsigned long i = 0; i < moduleInfo.sectionVirtualSize - sizeof(unsigned long); i += sizeof(unsigned long)) {
-        if (!memcmp((void*)((PBYTE)moduleInfo.sectionBase + i), pattern, szPattern)) {
+        if (!memcmp((void*)(Add2Ptr(moduleInfo.sectionBase, i)), pattern, szPattern)) {
             result = Add2Ptr(moduleInfo.sectionBase, i);
             break;
         }

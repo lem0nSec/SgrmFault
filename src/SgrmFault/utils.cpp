@@ -44,37 +44,6 @@ Exit:
     return status;
 }
 
-
-DWORD
-FindProcessId(_In_ const wchar_t* processName)
-{
-    HANDLE hSnap = 0;
-    PROCESSENTRY32W entry{};
-    DWORD processId = 0;
-
-    hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (hSnap == INVALID_HANDLE_VALUE || !hSnap) {
-        goto Exit;
-    }
-
-    entry.dwSize = sizeof(PROCESSENTRY32W);
-    if (Process32First(hSnap, &entry)) {
-        while (Process32Next(hSnap, &entry)) {
-            if (!_wcsicmp(processName, entry.szExeFile)) {
-                processId = entry.th32ProcessID;
-                break;
-            }
-        }
-    }
-
-Exit:
-    if (hSnap) {
-        CloseHandle(hSnap);
-    }
-
-    return processId;
-}
-
 BOOL
 ResolveModuleSectionBase(
     _In_ const wchar_t* moduleName,
@@ -109,7 +78,7 @@ ResolveModuleSectionBase(
 
     for (i = 0; i < pINH->FileHeader.NumberOfSections; i++, pISH++) {
         if (!strncmp((char*)pISH->Name, sectionName, IMAGE_SIZEOF_SHORT_NAME)) {
-            pSectionInfo->sectionBase = (void*)((PBYTE)hCurrent + pISH->VirtualAddress);
+            pSectionInfo->sectionBase = Add2Ptr(hCurrent, pISH->VirtualAddress);
             pSectionInfo->sectionVirtualSize = pISH->Misc.VirtualSize;
             pSectionInfo->moduleBase = (void*)hCurrent;
             status = TRUE;

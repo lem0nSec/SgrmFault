@@ -1,5 +1,9 @@
 #pragma once
 
+
+const wchar_t fileToLock[] = L"C:\\Windows\\System32\\license.rtf";
+const wchar_t STAData[] = L"Free";
+
 #pragma pack(push, 1)
 typedef struct _WER_MAPPED_SECTION_HEADER {
 	DWORD Unk;

@@ -13,10 +13,6 @@ BOOL
 EnableCurrentProcessPrivilege(
 	_In_ const wchar_t* SePrivilege);
 
-DWORD
-FindProcessId(
-	_In_ const wchar_t* processName);
-
 HANDLE
 SetOplockOnFile(
 	_In_ const wchar_t* fileToLock,
