@@ -53,7 +53,25 @@ The exploit may fail at the first attempt due to an issue while searching for th
 While the requirements above limit exploitation in newer Windows builds, smart changes to the POC may enable it to run on modern OS builds. This would lead to a 'Next Generation BYOVD' - entirely based on first-party components rather than third-party vulnerable drivers.
 
 ## Detection
-Lorem Ipsum
+SgrmFault Yara rule.
+
+```yara
+rule SgrmFault_detect {
+    meta:
+        author = "Angelo Frasca Caccia"
+        description = "Detects the SgrmFault binary"
+        reference = "https://github.com/lem0nSec/SgrmFault"
+        
+    strings:
+        $import1 = "NtContinue"
+        $clsid_twinapi = "{07FC2B94-5285-417E-8AC3-C2CE5240B0FA}" nocase wide ascii
+        $meow_header = { 4d 45 4f 57 }
+        $string1 = "SgrmBroker.exe" nocase wide ascii
+        
+    condition:        
+        (uint16(0) == 0x5A4D) and $import1 and $clsid_twinapi and $meow_header and $string1
+}
+```
 
 ## Authors
 * [Angelo Frasca Caccia](https://linkedin.com/in/angelo-frasca-caccia)
