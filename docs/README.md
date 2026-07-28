@@ -56,12 +56,12 @@ While the requirements above limit exploitation in newer Windows builds, smart c
 Lorem Ipsum
 
 ## Authors
-![Angelo Frasca Caccia](https://linkedin.com/in/angelo-frasca-caccia)
-![Alejandro Pinna](https://x.com/frodosobon)
+* [Angelo Frasca Caccia](https://linkedin.com/in/angelo-frasca-caccia)
+* [Alejandro Pinna](https://x.com/frodosobon)
 
 ## Credits
-* ![@tirannido](https://x.com/tiraniddo)
-* ![@mdsecactivebreach - com_inject](https://github.com/mdsecactivebreach/com_inject/tree/fe3424ba10bbfe8398b4d68377824dce57e425e1)
+* [@tirannido](https://x.com/tiraniddo)
+* [@mdsecactivebreach - com_inject](https://github.com/mdsecactivebreach/com_inject/tree/fe3424ba10bbfe8398b4d68377824dce57e425e1)
 
 ## References
 - https://projectzero.google/2018/10/injecting-code-into-windows-protected.html
