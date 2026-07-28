@@ -11,7 +11,7 @@ banner()
 {
     wprintf(
         L"*******************************************************************************\n"
-        L"*\tWerFaultSecure & SgrmAgent.sys Process Impairment Chain\n"
+        L"*\tSgrmFault: WerFaultSecure & SgrmAgent.sys Process Impairment Chain\n"
         L"*\tExploit chain presented at --> DEF CON 34 <--\n"
         L"*\tPresentation: {link to be updated}\n"
         L"*\tGitHub: https://www.github.com/lem0nSec/SgrmFault\n"
