@@ -285,7 +285,7 @@ GetLocalComOffsets(_Inout_ PLOCAL_COM_OFFSETS pOffsets)
         printf("[-] CoGetObjectContext(IID_IMarshalEnvoy) failed\n");
         return false;
     }
-    void* a = nullptr;
+
     //
     // Marshal the context header.
     // It should contain the secret GUID and heap address of server context.
@@ -323,7 +323,6 @@ GetLocalComOffsets(_Inout_ PLOCAL_COM_OFFSETS pOffsets)
     }
 
     pOffsets->DoCallbackSecretGuid = (ULONGLONG)addrOfGuid;
-    //*addrOfSecret = (ULONGLONG)addrOfGuid;
 
     addrOfContext = SearchPatternInCombaseDataSection(&hdr.ByRefHdr.pServerCtx, sizeof(PVOID));
     if (!addrOfContext) {
@@ -332,7 +331,6 @@ GetLocalComOffsets(_Inout_ PLOCAL_COM_OFFSETS pOffsets)
     }
 
     pOffsets->DoCallbackServerCtx = (ULONGLONG)addrOfContext;
-    //*serverContext = (ULONGLONG)addrOfContext;
 
     ipid_tbl = (ULONGLONG)GetIPIDTable();
     if (!ipid_tbl) {
@@ -341,7 +339,6 @@ GetLocalComOffsets(_Inout_ PLOCAL_COM_OFFSETS pOffsets)
     }
 
     pOffsets->IpidTable = (ULONG64)ipid_tbl;
-    //*symbolOffset = ipid_tbl;
 
     status = true;
 

@@ -12,8 +12,7 @@ banner()
     wprintf(
         L"*******************************************************************************\n"
         L"*\tSgrmFault: WerFaultSecure & SgrmAgent.sys Process Impairment Chain\n"
-        L"*\tExploit chain presented at --> DEF CON 34 <--\n"
-        L"*\tPresentation: {link to be updated}\n"
+        L"*\tExploit chain presented at REcon 2026 & DEF CON 34\n"
         L"*\tGitHub: https://www.github.com/lem0nSec/SgrmFault\n"
         L"*\tAngelo Frasca Caccia (lem0nSec_) & Alejandro Pinna\n"
         L"*******************************************************************************\n\n");
@@ -343,7 +342,7 @@ int wmain(int argc, wchar_t* argv[])
         !pShellcode ||
         !dwShellcodeLength ||
         dwShellcodeLength < 0) {
-        printf("[-] Error allocating SGRM shellcode\n");
+        printf("[-] Error allocating SGRM shellcode. Is %ws running?\n", TargetProcessName);
         return 0;
     }
 

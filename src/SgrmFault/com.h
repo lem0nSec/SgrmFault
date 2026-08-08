@@ -46,6 +46,7 @@ struct CPageAllocator {
 typedef struct tagIPIDEntry {
     struct tagIPIDEntry* pNextIPID;      // next IPIDEntry for same object
     DWORD                dwFlags;        // flags (see IPIDFLAGS)
+    //DWORD                flags;       // Windows 11 24h2+ requires this additional field
     ULONG                cStrongRefs;    // strong reference count
     ULONG                cWeakRefs;      // weak reference count
     ULONG                cPrivateRefs;   // private reference count
@@ -108,7 +109,6 @@ typedef struct OXIDEntryOld {
 */
 
 // OXIDEntry structure in combase.dll
-
 typedef struct OXIDEntry {
     CListElementPtr _flink;
     CListElementPtr _blink;
