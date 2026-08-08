@@ -1,5 +1,5 @@
 # SgrmFault - Process Tampering Exploit Chain
-SgrmFault revives a COM-based code injection in `WerFaultSecure` from 2018 to abuse an APC-based process tampering feature exposed by `SgrmAgent.sys`. **This research was presented at REcon 2026 and DEF CON 34 under the title "Chaining Microsoft Binaries to get Privileged Primitives in the Windows Kernel"**.
+SgrmFault revives a COM-based code injection in `WerFaultSecure` to abuse an APC-based process tampering feature exposed by `SgrmAgent.sys`. **This research was presented at REcon 2026 and DEF CON 34 under the title "Chaining Microsoft Binaries to get Privileged Primitives in the Windows Kernel"**.
 
 ```
 C:\Users\test\Desktop>SgrmFault.exe -p 2640 -t "MsMpEng.exe"
@@ -36,7 +36,7 @@ C:\Users\test\Desktop>SgrmFault.exe -p 2640 -t "MsMpEng.exe"
 - Windows 10 or 11 up to 22H2 with System Guard Runtime Monitor installed and running
 - `SgrmAgent.sys` version 10.0.20348.2849 or lower
 
-Windows 11 comes with SGRM up to 22H2, though the driver is not exploitable, but still downgradable to an older version.
+Windows 11 comes with SGRM up to 22H2, though the driver is not exploitable, but still downgradable to an older version like the one in `bins`.
 
 ## How to reproduce
 **Make sure you follow these steps:**
@@ -50,7 +50,7 @@ Windows 11 comes with SGRM up to 22H2, though the driver is not exploitable, but
 While this exploit chain specifically **targets Windows 11 22H2 and below**, it can be easily ported to newer versions of Windows with the following modifications:
 
 - Windows 24H2+ requires adding the field `DWORD flags` to the struct `IPIDEntry` as specified in `com.h:49`;
-- SGRM is not available on newer Windows versions, but `SgrmAgent.sys` can be just loaded as a service and exploited directly, without stealing an existing handle from `SgrmBroker.exe`.
+- SGRM is not available on newer Windows versions, but `SgrmAgent.sys` can be just loaded as a service and exploited directly, without stealing an existing handle from `SgrmBroker.exe`. Bear in mind that `WerFaultSecure.exe` requires `NT SERVICE\SgrmBroker` in the Token groups to be able to open a handle to the driver. This can be accomplished by simply creating a service named `SgrmBroker`. Any process running under that service will receive the SID the driver expects.
 
 
 ## Detection
