@@ -1,5 +1,9 @@
-# SgrmFault - Process Tampering Exploit Chain
-SgrmFault revives a COM-based code injection in `WerFaultSecure` to abuse an APC-based process tampering feature exposed by `SgrmAgent.sys`. **This research was presented at REcon 2026 and DEF CON 34 under the title "Chaining Microsoft Binaries to get Privileged Primitives in the Windows Kernel"**.
+# SgrmFault - Chaining Trusted Windows Components into a Privileged Process-Tampering Primitive
+SgrmFault is a Windows process-tampering exploit chain that combines a revived COM-based code-injection technique in WerFaultSecure.exe with an APC-based process-tampering primitive exposed by Microsoft’s SgrmAgent.sys driver. 
+
+The research demonstrates how seemingly unrelated, trusted Windows components can be composed to obtain capabilities that are significantly more powerful than the individual components expose on their own.
+
+**This research was presented at REcon 2026 and DEF CON 34 under the title "Chaining Microsoft Binaries to get Privileged Primitives in the Windows Kernel"**. This Proof-of-Concept code demonstrates the complete chain.
 
 ```
 C:\Users\test\Desktop>SgrmFault.exe -p 2640 -t "MsMpEng.exe"
