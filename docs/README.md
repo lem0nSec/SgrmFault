@@ -53,13 +53,9 @@ Windows 11 comes with SGRM up to 22H2, though the driver is not exploitable, but
 
 
 ## Compatibility Notes
-While this exploit chain specifically **targets Windows 11 22H2 and below**, it can be easily ported to newer versions of Windows with the following modifications:
+While this exploit chain specifically **targets Windows 11 22H2 and below**, because SGRM was deprecated in 2025 and not available on newer OS builds. That said, the PPL injection portion of this exploit can be ported to 25H2 with the following modification.
 
 - Windows 24H2+ requires adding the field `DWORD flags` to the struct `IPIDEntry` as specified in `com.h:49`;
-- SGRM is not available on newer Windows versions, but `SgrmAgent.sys` can be loaded as a service and exploited directly, without stealing an existing handle from `SgrmBroker.exe`. Bear in mind that `WerFaultSecure.exe` requires `NT SERVICE\SgrmBroker` in the Token groups to be able to open a handle to the driver. This can be accomplished by simply creating a service named `SgrmBroker`. Any process running under that service will receive the SID the driver expects.
-
-Given the above conditions, a **BYOVD attack** based on SgrmFault would be unique, as **entirely based on first-party components rather than third-party vulnerable drivers.**
-
 
 ## Detection
 This is a basic Yara rule to detect the compiled SgrmFault.exe binary.
